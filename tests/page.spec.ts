@@ -82,13 +82,36 @@ async function basicInit(page: Page) {
 
   // Order a pizza.
   await page.route("*/**/api/order", async (route) => {
-    const orderReq = route.request().postDataJSON();
-    const orderRes = {
-      order: { ...orderReq, id: 23 },
-      jwt: "eyJpYXQ",
-    };
-    expect(route.request().method()).toBe("POST");
-    await route.fulfill({ json: orderRes });
+    const method = route.request().method();
+
+    if (method === "POST") {
+      // Create order
+      const orderReq = route.request().postDataJSON();
+      const orderRes = {
+        order: { ...orderReq, id: 23 },
+        jwt: "eyJpYXQ",
+      };
+      await route.fulfill({ json: orderRes });
+    } else if (method === "GET") {
+      // Get order history for diner dashboard
+      const orderHistory = {
+        dinerId: 3,
+        orders: [
+          {
+            id: 1,
+            franchiseId: 2,
+            storeId: 4,
+            date: "2024-06-05T05:14:40.000Z",
+            items: [
+              { id: 1, menuId: 1, description: "Veggie", price: 0.0038 },
+              { id: 2, menuId: 2, description: "Pepperoni", price: 0.0042 },
+            ],
+          },
+        ],
+        page: 1,
+      };
+      await route.fulfill({ json: orderHistory });
+    }
   });
 
   await page.goto("/");
@@ -136,4 +159,22 @@ test("view franchise page while not logged in", async ({ page }) => {
       .nth(2),
   ).toBeVisible();
   await expect(page.getByRole("link", { name: "-555-5555" })).toBeVisible();
+});
+
+test("view diner dashboard as logged in diner", async ({ page }) => {
+  await basicInit(page);
+
+  // Log in as diner
+  await page.getByRole("link", { name: "Login" }).click();
+  await page.getByRole("textbox", { name: "Email address" }).fill("d@jwt.com");
+  await page.getByRole("textbox", { name: "Password" }).fill("a");
+  await page.getByRole("button", { name: "Login" }).click();
+
+  // Navigate to diner dashboard
+  await page.getByRole("link", { name: "KC" }).click();
+
+  // Verify dashboard content
+  await expect(page.getByText("Your pizza kitchen")).toBeVisible();
+  await expect(page.getByText("Kai Chen")).toBeVisible();
+  await expect(page.getByText("d@jwt.com")).toBeVisible();
 });
