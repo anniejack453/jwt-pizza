@@ -108,3 +108,12 @@ test("view about page", async ({ page }) => {
     page.getByRole("contentinfo").getByRole("link", { name: "Franchise" }),
   ).toBeVisible();
 });
+
+test("view history page", async ({ page }) => {
+  await page.goto("/");
+
+  await page.getByRole("link", { name: "History" }).click();
+
+  await expect(page.getByText("Mama Rucci, my my")).toBeVisible();
+  await expect(page.getByRole("main").getByRole("img")).toBeVisible();
+});
