@@ -178,3 +178,80 @@ test("view diner dashboard as logged in diner", async ({ page }) => {
   await expect(page.getByText("Kai Chen")).toBeVisible();
   await expect(page.getByText("d@jwt.com")).toBeVisible();
 });
+
+test("view admin dashboard as admin", async ({ page }) => {
+  let loggedInUser: User | undefined;
+  const adminUsers: Record<string, User> = {
+    "admin@jwt.com": {
+      id: "1",
+      name: "Admin User",
+      email: "admin@jwt.com",
+      password: "admin",
+      roles: [{ role: Role.Admin }],
+    },
+  };
+
+  // Mock auth endpoint for admin login
+  await page.route("*/**/api/auth", async (route) => {
+    const loginReq = route.request().postDataJSON();
+    const user = adminUsers[loginReq.email];
+    if (!user || user.password !== loginReq.password) {
+      await route.fulfill({ status: 401, json: { message: "Unauthorized" } });
+      return;
+    }
+    loggedInUser = adminUsers[loginReq.email];
+    await route.fulfill({ json: { user: loggedInUser, token: "admin-token" } });
+  });
+
+  // Mock user/me endpoint
+  await page.route("*/**/api/user/me", async (route) => {
+    await route.fulfill({ json: loggedInUser });
+  });
+
+  // Mock franchise list for admin dashboard
+  await page.route(/\/api\/franchise(\?.*)?$/, async (route) => {
+    const franchiseRes = {
+      franchises: [
+        {
+          id: 2,
+          name: "LotaPizza",
+          admins: [{ id: 5, name: "Frank Franchiser", email: "f@jwt.com" }],
+          stores: [
+            { id: 4, name: "Lehi", totalRevenue: 0.048 },
+            { id: 5, name: "Springville", totalRevenue: 0.032 },
+          ],
+        },
+        {
+          id: 3,
+          name: "PizzaCorp",
+          admins: [{ id: 6, name: "Corp Admin", email: "corp@jwt.com" }],
+          stores: [{ id: 7, name: "Spanish Fork", totalRevenue: 0.024 }],
+        },
+      ],
+    };
+    await route.fulfill({ json: franchiseRes });
+  });
+
+  await page.goto("/");
+
+  // Log in as admin
+  await page.getByRole("link", { name: "Login" }).click();
+  await page
+    .getByRole("textbox", { name: "Email address" })
+    .fill("admin@jwt.com");
+  await page.getByRole("textbox", { name: "Password" }).fill("admin");
+  await page.getByRole("button", { name: "Login" }).click();
+
+  // Navigate to admin dashboard
+  await page.getByRole("link", { name: "Admin" }).click();
+
+  // Verify admin dashboard content
+  await expect(
+    page.getByRole("heading", { name: "Mama Ricci's kitchen" }),
+  ).toBeVisible();
+  await expect(page.getByText("LotaPizza")).toBeVisible();
+  await expect(page.getByText("PizzaCorp")).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Add Franchise" }),
+  ).toBeVisible();
+});
