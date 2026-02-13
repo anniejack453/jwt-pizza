@@ -137,3 +137,42 @@ test("purchase with login", async ({ page }) => {
   // Check balance
   await expect(page.getByText("0.008")).toBeVisible();
 });
+
+test("login as admin", async ({ page }) => {
+  // Customize basicInit for admin
+  let loggedInUser: User | undefined;
+  const adminUsers: Record<string, User> = {
+    "admin@jwt.com": {
+      id: "1",
+      name: "Admin User",
+      email: "admin@jwt.com",
+      password: "adminpass",
+      roles: [{ role: Role.Admin }],
+    },
+  };
+
+  await page.route("*/**/api/auth", async (route) => {
+    const loginReq = route.request().postDataJSON();
+    const user = adminUsers[loginReq.email];
+    if (!user || user.password !== loginReq.password) {
+      await route.fulfill({ status: 401, json: { message: "Unauthorized" } });
+      return;
+    }
+    loggedInUser = adminUsers[loginReq.email];
+    await route.fulfill({ json: { user: loggedInUser, token: "abcdef" } });
+  });
+
+  // ... rest of mocks
+  await page.goto("/");
+
+  // Test admin login
+  await page.getByRole("link", { name: "Login" }).click();
+  await page
+    .getByRole("textbox", { name: "Email address" })
+    .fill("admin@jwt.com");
+  await page.getByRole("textbox", { name: "Password" }).fill("adminpass");
+  await page.getByRole("button", { name: "Login" }).click();
+
+  await expect(page.getByRole("link", { name: "AU" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Admin" })).toBeVisible();
+});
