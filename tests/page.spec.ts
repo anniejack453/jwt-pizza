@@ -117,3 +117,23 @@ test("view history page", async ({ page }) => {
   await expect(page.getByText("Mama Rucci, my my")).toBeVisible();
   await expect(page.getByRole("main").getByRole("img")).toBeVisible();
 });
+
+test("view franchise page while not logged in", async ({ page }) => {
+  await page.goto("/");
+
+  await page
+    .getByRole("contentinfo")
+    .getByRole("link", { name: "Franchise" })
+    .click();
+  await expect(page.getByText("So you want a piece of the")).toBeVisible();
+  await expect(
+    page
+      .locator("div")
+      .filter({
+        hasText:
+          /^If you are already a franchisee, pleaseloginusing your franchise account$/,
+      })
+      .nth(2),
+  ).toBeVisible();
+  await expect(page.getByRole("link", { name: "-555-5555" })).toBeVisible();
+});
