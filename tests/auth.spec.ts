@@ -223,3 +223,60 @@ test("register new user", async ({ page }) => {
   // Verify registration success
   await expect(page.getByRole("link", { name: "NU" })).toBeVisible();
 });
+
+test("logout", async ({ page }) => {
+  let loggedInUser: User | undefined;
+  const validUsers: Record<string, User> = {
+    "d@jwt.com": {
+      id: "3",
+      name: "Kai Chen",
+      email: "d@jwt.com",
+      password: "a",
+      roles: [{ role: Role.Diner }],
+    },
+  };
+
+  // Mock auth endpoint to handle both login and logout
+  await page.route("*/**/api/auth", async (route) => {
+    const method = route.request().method();
+
+    if (method === "PUT") {
+      // Login
+      const loginReq = route.request().postDataJSON();
+      const user = validUsers[loginReq.email];
+      if (!user || user.password !== loginReq.password) {
+        await route.fulfill({ status: 401, json: { message: "Unauthorized" } });
+        return;
+      }
+      loggedInUser = validUsers[loginReq.email];
+      await route.fulfill({ json: { user: loggedInUser, token: "abcdef" } });
+    } else if (method === "DELETE") {
+      // Logout
+      loggedInUser = undefined;
+      await route.fulfill({ json: { message: "logout successful" } });
+    }
+  });
+
+  // Mock user/me endpoint
+  await page.route("*/**/api/user/me", async (route) => {
+    await route.fulfill({ json: loggedInUser });
+  });
+
+  await page.goto("/");
+
+  // Log in
+  await page.getByRole("link", { name: "Login" }).click();
+  await page.getByRole("textbox", { name: "Email address" }).fill("d@jwt.com");
+  await page.getByRole("textbox", { name: "Password" }).fill("a");
+  await page.getByRole("button", { name: "Login" }).click();
+
+  // Verify logged in
+  await expect(page.getByRole("link", { name: "KC" })).toBeVisible();
+
+  // Logout
+  await page.getByRole("link", { name: "Logout" }).click();
+
+  // Verify logged out
+  await expect(page.getByRole("link", { name: "Login" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "KC" })).not.toBeVisible();
+});
