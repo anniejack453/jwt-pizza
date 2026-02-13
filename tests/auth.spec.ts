@@ -176,3 +176,50 @@ test("login as admin", async ({ page }) => {
   await expect(page.getByRole("link", { name: "AU" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Admin" })).toBeVisible();
 });
+
+test("register new user", async ({ page }) => {
+  let loggedInUser: User | undefined;
+
+  // Mock registration endpoint
+  await page.route("*/**/api/auth", async (route) => {
+    const method = route.request().method();
+
+    if (method === "POST") {
+      // Registration
+      const registerReq = route.request().postDataJSON();
+      loggedInUser = {
+        id: "999",
+        name: registerReq.name,
+        email: registerReq.email,
+        password: registerReq.password,
+        roles: [{ role: Role.Diner }],
+      };
+      const registerRes = {
+        user: loggedInUser,
+        token: "newtoken123",
+      };
+      await route.fulfill({ json: registerRes });
+    } else if (method === "PUT") {
+      // Login (if needed)
+      const loginReq = route.request().postDataJSON();
+      // ... handle login
+    }
+  });
+
+  // Mock other endpoints
+  await page.route("*/**/api/user/me", async (route) => {
+    await route.fulfill({ json: loggedInUser });
+  });
+
+  await page.goto("/");
+
+  // Test registration
+  await page.getByRole("link", { name: "Register" }).click();
+  await page.getByPlaceholder("Full name").fill("New User");
+  await page.getByPlaceholder("Email address").fill("newuser@test.com");
+  await page.getByPlaceholder("Password").fill("password123");
+  await page.getByRole("button", { name: "Register" }).click();
+
+  // Verify registration success
+  await expect(page.getByRole("link", { name: "NU" })).toBeVisible();
+});
