@@ -244,4 +244,75 @@ test("updateUser - admin role", async ({ page }) => {
   await page.waitForURL(/.*dashboard/, { timeout: 5000 }).catch(() => {});
 
   await expect(page.getByRole("main")).toContainText("Super Admin");
+  await page.getByRole("link", { name: "Logout" }).click();
+  await page.getByRole("link", { name: "Login" }).click();
+
+  await page.getByRole("textbox", { name: "Email address" }).fill(email);
+  await page.getByRole("textbox", { name: "Password" }).fill("admin");
+  await page.getByRole("button", { name: "Login" }).click();
+
+  await page.getByRole("link", { name: "SA" }).click();
+  await expect(page.getByRole("main")).toContainText("Super Admin");
+});
+
+test("updateUser - franchisee role", async ({ page }) => {
+  const email = "franchisee@jwt.com";
+  const loggedInUser = {
+    value: {
+      id: "2",
+      name: "Franchisee User",
+      email,
+      password: "franchisee",
+      roles: [{ role: Role.Franchisee }],
+    } as User,
+  };
+
+  await setupMocks(page, loggedInUser);
+
+  await page.route("*/**/api/auth", async (route) => {
+    const method = route.request().method();
+    if (method === "PUT") {
+      const loginReq = await route.request().postDataJSON();
+      if (
+        loggedInUser.value &&
+        loginReq.email === loggedInUser.value.email &&
+        loginReq.password === loggedInUser.value.password
+      ) {
+        await route.fulfill({
+          json: { user: loggedInUser.value, token: "abcdef" },
+        });
+      } else {
+        await route.fulfill({ status: 401, json: { error: "Unauthorized" } });
+      }
+    } else if (method === "DELETE") {
+      await route.fulfill({ json: { message: "logout successful" } });
+    }
+  });
+
+  await page.goto("/");
+  await page.getByRole("link", { name: "Login" }).click();
+
+  await page.getByRole("textbox", { name: "Email address" }).fill(email);
+  await page.getByRole("textbox", { name: "Password" }).fill("franchisee");
+  await page.getByRole("button", { name: "Login" }).click();
+
+  await page.getByRole("link", { name: "FU" }).click();
+
+  await page.getByRole("button", { name: "Edit" }).click();
+  await expect(page.locator("h3")).toContainText("Edit user");
+  await page.getByRole("textbox").first().fill("Franchisee Manager");
+  await page.getByRole("button", { name: "Update" }).click();
+  await page.waitForURL(/.*dashboard/, { timeout: 5000 }).catch(() => {});
+
+  await expect(page.getByRole("main")).toContainText("Franchisee Manager");
+
+  await page.getByRole("link", { name: "Logout" }).click();
+  await page.getByRole("link", { name: "Login" }).click();
+
+  await page.getByRole("textbox", { name: "Email address" }).fill(email);
+  await page.getByRole("textbox", { name: "Password" }).fill("franchisee");
+  await page.getByRole("button", { name: "Login" }).click();
+
+  await page.getByRole("link", { name: "FM" }).click();
+  await expect(page.getByRole("main")).toContainText("Franchisee Manager");
 });
