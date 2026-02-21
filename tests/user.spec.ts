@@ -192,3 +192,56 @@ test("updateUser - change password", async ({ page }) => {
   await page.getByRole("link", { name: "pd" }).click();
   await expect(page.getByRole("main")).toContainText("pizza diner");
 });
+
+test("updateUser - admin role", async ({ page }) => {
+  const email = "admin@jwt.com";
+  const loggedInUser = {
+    value: {
+      id: "1",
+      name: "Admin User",
+      email,
+      password: "admin",
+      roles: [{ role: Role.Admin }],
+    } as User,
+  };
+
+  await setupMocks(page, loggedInUser);
+
+  // Similarly set up auth route for admin
+  await page.route("*/**/api/auth", async (route) => {
+    const method = route.request().method();
+    if (method === "PUT") {
+      const loginReq = await route.request().postDataJSON();
+      if (
+        loggedInUser.value &&
+        loginReq.email === loggedInUser.value.email &&
+        loginReq.password === loggedInUser.value.password
+      ) {
+        await route.fulfill({
+          json: { user: loggedInUser.value, token: "abcdef" },
+        });
+      } else {
+        await route.fulfill({ status: 401, json: { error: "Unauthorized" } });
+      }
+    } else if (method === "DELETE") {
+      await route.fulfill({ json: { message: "logout successful" } });
+    }
+  });
+
+  await page.goto("/");
+  await page.getByRole("link", { name: "Login" }).click();
+
+  await page.getByRole("textbox", { name: "Email address" }).fill(email);
+  await page.getByRole("textbox", { name: "Password" }).fill("admin");
+  await page.getByRole("button", { name: "Login" }).click();
+
+  await page.getByRole("link", { name: "AU" }).click();
+
+  await page.getByRole("button", { name: "Edit" }).click();
+  await expect(page.locator("h3")).toContainText("Edit user");
+  await page.getByRole("textbox").first().fill("Super Admin");
+  await page.getByRole("button", { name: "Update" }).click();
+  await page.waitForURL(/.*dashboard/, { timeout: 5000 }).catch(() => {});
+
+  await expect(page.getByRole("main")).toContainText("Super Admin");
+});
