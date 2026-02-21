@@ -284,3 +284,115 @@ test("franchisee creates store for their franchise", async ({ page }) => {
   // Verify store was created and we're back on franchise dashboard
   await expect(page.getByText(storeName)).toBeVisible();
 });
+
+test("franchisee deletes store in their franchise", async ({ page }) => {
+  const franchiseeEmail = "f@jwt.com";
+  const franchiseePassword = "franchisee";
+  const franchiseId = 1;
+  const franchiseName = "pizzaPocket";
+  let loggedInUser: User | undefined;
+  let stores: any[] = [
+    {
+      id: 1,
+      name: "Store to Delete",
+      totalRevenue: 0,
+    },
+  ];
+
+  const franchiseeUser: User = {
+    id: "3",
+    name: "pizza franchisee",
+    email: franchiseeEmail,
+    password: franchiseePassword,
+    roles: [{ role: Role.Diner }],
+  };
+
+  // Mock auth endpoint
+  await page.route("*/**/api/auth", async (route) => {
+    const loginReq = route.request().postDataJSON();
+    if (
+      loginReq.email !== franchiseeEmail ||
+      loginReq.password !== franchiseePassword
+    ) {
+      await route.fulfill({ status: 401, json: { message: "Unauthorized" } });
+      return;
+    }
+    loggedInUser = franchiseeUser;
+    await route.fulfill({
+      json: { user: loggedInUser, token: "franchisee-token" },
+    });
+  });
+
+  // Mock user/me endpoint
+  await page.route("*/**/api/user/me", async (route) => {
+    await route.fulfill({ json: loggedInUser });
+  });
+
+  // Mock franchise and store endpoints
+  await page.route(/\/api\/franchise(\/.*)?(\?.*)?$/, async (route) => {
+    const method = route.request().method();
+    const url = new URL(route.request().url());
+    const pathParts = url.pathname.split("/");
+    const storeId = pathParts[pathParts.length - 1];
+
+    if (method === "GET") {
+      const franchiseRes = [
+        {
+          id: franchiseId,
+          name: franchiseName,
+          admins: [{ id: 3, name: "pizza franchisee", email: franchiseeEmail }],
+          stores: stores,
+        },
+      ];
+      await route.fulfill({ json: franchiseRes });
+    } else if (method === "DELETE") {
+      // Delete store - remove from stores array
+      stores = stores.filter(
+        (s) => s.id.toString() !== storeId && s.id !== parseInt(storeId),
+      );
+      await route.fulfill({ json: { message: "Store deleted" } });
+    }
+  });
+
+  await page.goto("/");
+
+  // Log in as franchisee
+  await page.getByRole("link", { name: "Login" }).click();
+  await page
+    .getByRole("textbox", { name: "Email address" })
+    .fill(franchiseeEmail);
+  await page
+    .getByRole("textbox", { name: "Password" })
+    .fill(franchiseePassword);
+  await page.getByRole("button", { name: "Login" }).click();
+
+  // Navigate to franchise dashboard
+  await page
+    .getByRole("banner")
+    .getByRole("link", { name: "Franchise" })
+    .click();
+
+  // Verify store is visible
+  await expect(page.getByText("Store to Delete")).toBeVisible();
+
+  // Delete the store (first click navigates to confirmation page)
+  await page.getByRole("button", { name: "Close" }).click();
+
+  // Verify confirmation page is shown
+  await expect(
+    page.getByText(
+      /Are you sure you want to close the pizzaPocket store Store to Delete/,
+    ),
+  ).toBeVisible();
+
+  // Click Close again to confirm
+  await page.getByRole("button", { name: "Close" }).click();
+
+  // Wait for navigation back to franchise dashboard
+  await expect(
+    page.getByRole("heading", { name: "pizzaPocket" }),
+  ).toBeVisible();
+
+  // Verify store is no longer visible
+  await expect(page.getByText("Store to Delete")).not.toBeVisible();
+});
