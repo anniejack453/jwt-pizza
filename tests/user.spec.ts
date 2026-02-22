@@ -352,52 +352,60 @@ test("admin lists all users with pagination", async ({ page }) => {
     }
   });
 
-  // Mock the /api/user endpoint for listing users (actual endpoint)
-  await page.route(/\/api\/user(\?.*)?$/, async (route) => {
+  // Mock the /api/user endpoint for listing users and deleting users
+  await page.route(/\/api\/user(\/.*)?(\?.*)?$/, async (route) => {
+    const method = route.request().method();
     const url = new URL(route.request().url());
-    const pageParam = url.searchParams.get("page") || "0";
-    const limit = url.searchParams.get("limit") || "10";
-    const name = url.searchParams.get("name") || "*";
 
-    // Simulate a list of users from the backend
-    const allUsers = [
-      {
-        id: 3,
-        name: "Kai Chen",
-        email: "d@jwt.com",
-        roles: [{ role: Role.Diner }],
-      },
-      {
-        id: 5,
-        name: "Buddy",
-        email: "b@jwt.com",
-        roles: [{ role: Role.Admin }],
-      },
-      {
-        id: 1,
-        name: "Admin User",
-        email: "admin@jwt.com",
-        roles: [{ role: Role.Admin }],
-      },
-    ];
+    if (method === "GET") {
+      const pageParam = url.searchParams.get("page") || "0";
+      const limit = url.searchParams.get("limit") || "10";
+      const name = url.searchParams.get("name") || "*";
 
-    // Filter users by name if not wildcard
-    let filteredUsers = allUsers;
-    if (name !== "*") {
-      const searchTerm = name.replace(/\*/g, "").toLowerCase();
-      filteredUsers = allUsers.filter((u) =>
-        u.name.toLowerCase().includes(searchTerm),
-      );
+      // Simulate a list of users from the backend
+      const allUsers = [
+        {
+          id: 3,
+          name: "Kai Chen",
+          email: "d@jwt.com",
+          roles: [{ role: Role.Diner }],
+        },
+        {
+          id: 5,
+          name: "Buddy",
+          email: "b@jwt.com",
+          roles: [{ role: Role.Admin }],
+        },
+        {
+          id: 1,
+          name: "Admin User",
+          email: "admin@jwt.com",
+          roles: [{ role: Role.Admin }],
+        },
+      ];
+
+      // Filter users by name if not wildcard
+      let filteredUsers = allUsers;
+      if (name !== "*") {
+        const searchTerm = name.replace(/\*/g, "").toLowerCase();
+        filteredUsers = allUsers.filter((u) =>
+          u.name.toLowerCase().includes(searchTerm),
+        );
+      }
+
+      const startIdx = parseInt(pageParam) * parseInt(limit);
+      const endIdx = startIdx + parseInt(limit);
+      const paginatedUsers = filteredUsers.slice(startIdx, endIdx);
+      const more = endIdx < filteredUsers.length;
+
+      await route.fulfill({
+        json: { users: paginatedUsers, more },
+      });
+    } else if (method === "DELETE") {
+      // Handle user deletion
+      const userId = url.pathname.split("/").pop();
+      await route.fulfill({ json: { message: "User deleted" } });
     }
-
-    const startIdx = parseInt(pageParam) * parseInt(limit);
-    const endIdx = startIdx + parseInt(limit);
-    const paginatedUsers = filteredUsers.slice(startIdx, endIdx);
-    const more = endIdx < filteredUsers.length;
-
-    await route.fulfill({
-      json: { users: paginatedUsers, more },
-    });
   });
 
   // Mock franchise endpoint
@@ -420,4 +428,138 @@ test("admin lists all users with pagination", async ({ page }) => {
   await expect(page.getByText("d@jwt.com")).toBeVisible();
   await expect(page.getByText("Buddy")).toBeVisible();
   await expect(page.getByText("b@jwt.com")).toBeVisible();
+});
+
+test("admin deletes a user", async ({ page }) => {
+  const adminEmail = "admin@jwt.com";
+  const adminPassword = "admin";
+  let loggedInUser: User | undefined;
+  let allUsers = [
+    {
+      id: "3",
+      name: "Kai Chen",
+      email: "d@jwt.com",
+      roles: [{ role: Role.Diner }],
+    },
+    {
+      id: "5",
+      name: "Buddy",
+      email: "b@jwt.com",
+      roles: [{ role: Role.Admin }],
+    },
+    {
+      id: "1",
+      name: "Admin User",
+      email: adminEmail,
+      password: adminPassword,
+      roles: [{ role: Role.Admin }],
+    },
+  ];
+
+  // Mock auth endpoint
+  await page.route("*/**/api/auth", async (route) => {
+    const method = route.request().method();
+    if (method === "PUT") {
+      const loginReq = await route.request().postDataJSON();
+      if (
+        loginReq.email === adminEmail &&
+        loginReq.password === adminPassword
+      ) {
+        loggedInUser = allUsers.find((u) => u.email === adminEmail) as User;
+        await route.fulfill({
+          json: { user: loggedInUser, token: "admin-token" },
+        });
+      } else {
+        await route.fulfill({ status: 401, json: { error: "Unauthorized" } });
+      }
+    } else if (method === "DELETE") {
+      await route.fulfill({ json: { message: "logout successful" } });
+    }
+  });
+
+  // Mock user/me endpoint
+  await page.route("*/**/api/user/me", async (route) => {
+    expect(route.request().method()).toBe("GET");
+    await route.fulfill({ json: loggedInUser });
+  });
+
+  // Mock the /api/user endpoint for listing users and deleting users
+  await page.route(/\/api\/user(\/.*)?(\?.*)?$/, async (route) => {
+    const method = route.request().method();
+    if (method === "GET") {
+      const url = new URL(route.request().url());
+      const pageParam = url.searchParams.get("page") || "0";
+      const limit = url.searchParams.get("limit") || "10";
+      const name = url.searchParams.get("name") || "*";
+
+      // Filter users by name if not wildcard
+      let filteredUsers = allUsers;
+      if (name !== "*") {
+        const searchTerm = name.replace(/\*/g, "").toLowerCase();
+        filteredUsers = allUsers.filter((u) =>
+          u.name.toLowerCase().includes(searchTerm),
+        );
+      }
+
+      const startIdx = parseInt(pageParam) * parseInt(limit);
+      const endIdx = startIdx + parseInt(limit);
+      const paginatedUsers = filteredUsers.slice(startIdx, endIdx);
+      const more = endIdx < filteredUsers.length;
+
+      await route.fulfill({
+        json: { users: paginatedUsers, more },
+      });
+    } else if (method === "DELETE") {
+      // Handle user deletion
+      const url = new URL(route.request().url());
+      const userId = url.pathname.split("/").pop();
+      allUsers = allUsers.filter((u) => u.id !== userId);
+      await route.fulfill({ json: { message: "User deleted" } });
+    }
+  });
+
+  // Mock franchise endpoint
+  await page.route(/\/api\/franchise(\?.*)?$/, async (route) => {
+    await route.fulfill({ json: { franchises: [], more: false } });
+  });
+
+  await page.goto("/");
+
+  // Log in as admin
+  await page.getByRole("link", { name: "Login" }).click();
+  await page.getByRole("textbox", { name: "Email address" }).fill(adminEmail);
+  await page.getByRole("textbox", { name: "Password" }).fill(adminPassword);
+  await page.getByRole("button", { name: "Login" }).click();
+
+  // Navigate to admin dashboard
+  await page.getByRole("link", { name: "Admin" }).click();
+
+  // Verify Kai Chen is visible
+  await expect(page.getByText("Kai Chen")).toBeVisible();
+
+  // Delete the user (first click navigates to confirmation page)
+  const deleteButtons = await page
+    .getByRole("button", { name: /Delete/ })
+    .all();
+  // Click the first delete button (for Kai Chen)
+  await deleteButtons[0].click();
+
+  // Verify confirmation page is shown
+  await expect(
+    page.getByText(/Are you sure you want to delete the user/),
+  ).toBeVisible();
+
+  // Click Delete again to confirm
+  await page
+    .getByRole("button", { name: /Delete/ })
+    .first()
+    .click();
+
+  // Wait for navigation back to admin dashboard
+  await expect(
+    page.getByRole("heading", { name: "Mama Ricci's kitchen" }),
+  ).toBeVisible();
+
+  // Verify Kai Chen is no longer visible
+  await expect(page.getByText("Kai Chen")).not.toBeVisible();
 });
