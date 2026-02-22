@@ -316,3 +316,108 @@ test("updateUser - franchisee role", async ({ page }) => {
   await page.getByRole("link", { name: "FM" }).click();
   await expect(page.getByRole("main")).toContainText("Franchisee Manager");
 });
+
+test("admin lists all users with pagination", async ({ page }) => {
+  const adminEmail = "admin@jwt.com";
+  const adminPassword = "admin";
+  const loggedInUser = {
+    value: {
+      id: "1",
+      name: "Admin User",
+      email: adminEmail,
+      password: adminPassword,
+      roles: [{ role: Role.Admin }],
+    } as User,
+  };
+
+  await setupMocks(page, loggedInUser);
+
+  await page.route("*/**/api/auth", async (route) => {
+    const method = route.request().method();
+    if (method === "PUT") {
+      const loginReq = await route.request().postDataJSON();
+      if (
+        loggedInUser.value &&
+        loginReq.email === loggedInUser.value.email &&
+        loginReq.password === loggedInUser.value.password
+      ) {
+        await route.fulfill({
+          json: { user: loggedInUser.value, token: "admin-token" },
+        });
+      } else {
+        await route.fulfill({ status: 401, json: { error: "Unauthorized" } });
+      }
+    } else if (method === "DELETE") {
+      await route.fulfill({ json: { message: "logout successful" } });
+    }
+  });
+
+  // Mock the /api/user endpoint for listing users (actual endpoint)
+  await page.route(/\/api\/user(\?.*)?$/, async (route) => {
+    const url = new URL(route.request().url());
+    const pageParam = url.searchParams.get("page") || "0";
+    const limit = url.searchParams.get("limit") || "10";
+    const name = url.searchParams.get("name") || "*";
+
+    // Simulate a list of users from the backend
+    const allUsers = [
+      {
+        id: 3,
+        name: "Kai Chen",
+        email: "d@jwt.com",
+        roles: [{ role: Role.Diner }],
+      },
+      {
+        id: 5,
+        name: "Buddy",
+        email: "b@jwt.com",
+        roles: [{ role: Role.Admin }],
+      },
+      {
+        id: 1,
+        name: "Admin User",
+        email: "admin@jwt.com",
+        roles: [{ role: Role.Admin }],
+      },
+    ];
+
+    // Filter users by name if not wildcard
+    let filteredUsers = allUsers;
+    if (name !== "*") {
+      const searchTerm = name.replace(/\*/g, "").toLowerCase();
+      filteredUsers = allUsers.filter((u) =>
+        u.name.toLowerCase().includes(searchTerm),
+      );
+    }
+
+    const startIdx = parseInt(pageParam) * parseInt(limit);
+    const endIdx = startIdx + parseInt(limit);
+    const paginatedUsers = filteredUsers.slice(startIdx, endIdx);
+    const more = endIdx < filteredUsers.length;
+
+    await route.fulfill({
+      json: { users: paginatedUsers, more },
+    });
+  });
+
+  // Mock franchise endpoint
+  await page.route(/\/api\/franchise(\?.*)?$/, async (route) => {
+    await route.fulfill({ json: { franchises: [], more: false } });
+  });
+
+  await page.goto("/");
+  await page.getByRole("link", { name: "Login" }).click();
+
+  await page.getByRole("textbox", { name: "Email address" }).fill(adminEmail);
+  await page.getByRole("textbox", { name: "Password" }).fill(adminPassword);
+  await page.getByRole("button", { name: "Login" }).click();
+
+  // Navigate to admin dashboard
+  await page.getByRole("link", { name: "Admin" }).click();
+
+  // Verify users table is displayed with user data
+  await expect(page.getByText("Kai Chen")).toBeVisible();
+  await expect(page.getByText("d@jwt.com")).toBeVisible();
+  await expect(page.getByText("Buddy")).toBeVisible();
+  await expect(page.getByText("b@jwt.com")).toBeVisible();
+});
