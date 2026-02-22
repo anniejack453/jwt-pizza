@@ -25,7 +25,13 @@ async function setupMocks(
       }
       await route.fulfill({ status: 200, json: loggedInUser.value });
     } else if (method === "GET") {
-      await route.fulfill({ status: 200, json: loggedInUser.value });
+      // Skip requests with query parameters (those are for listing users)
+      const url = new URL(route.request().url());
+      if (!url.search) {
+        await route.fulfill({ status: 200, json: loggedInUser.value });
+      } else {
+        route.continue();
+      }
     }
   });
 
