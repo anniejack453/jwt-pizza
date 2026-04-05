@@ -1,4 +1,4 @@
-# NPM
+# Curiosity Report: NPM
 
 ## Introduction
 
@@ -18,7 +18,7 @@ This is typically one of the first commands to run. npm init initializes a Node.
 
 If you have a package.json file in your project, running npm install will automatically install all the required packages/dependencies found in that file, and put them in a node_modules folder.
 
-#### Special Add-ons for npm install:
+#### Special Add-ons for npm install
 
 If you run npm install <specific package name>, you install that specific package whether it's in your package.json file or not, and will add the package to your package.json dependencies
 Adding --save-dev installs the package and adds it to devDependencies in package.json.
@@ -54,10 +54,15 @@ npm dedupe decreases the size of the node_modules folder by removing duplicate p
 
 npm shrinkwrap either turns package-lock.json into a publishable npm-shrinkwrap.json or creates a new one. This file locks down dependency versions for publication.
 
-## Experiment
+## Try it for yourself
 
 1. Clone this repository
 2. Check out package.json. See all the dependencies and scripts?
 3. Run npm install to install the dependencies
 4. Try running a script or two using npm run <script-name>
-5. Try npm audit and read the report
+5. Try npm audit and read the report. Decide what you want to do to fix the issues, if there are any
+6. Congrats, you have learned some npm fundamentals!
+
+## Conclusion
+
+I think understanding npm is very important because it is so widely used and has a big role in any projects it is a part of. Having the right packages installed is essential to having a safe, well-functioning project. Instead of just running commands as we are told, it's better to understand the meaning behind them to better know what is happening behind the scenes with your code.
