@@ -1,4 +1,4 @@
-# Incident: YYYY-MM-DD HH-mm-ss
+# Incident: 2026-04-08 17-45-34
 
 ## Summary
 
@@ -6,13 +6,9 @@
 > Write a summary of the incident in a few sentences. Include what happened, why, the severity of the incident and how long the impact lasted.
 
 ```md
-**EXAMPLE**:
+Between the hour of 17:45 and 18:01 on 04/08/26, 1 user encountered an issue with ordering pizzas. The event was triggered by a factory server shutdown at 17:45. The factory server shutdown was instigated by a chaos monkey.
 
-Between the hour of {time range of incident, e.g. 15:45 and 16:35} on {DATE}, {NUMBER} users encountered {EVENT SYMPTOMS}. The event was triggered by a {CHANGE} at {TIME OF CHANGE THAT CAUSED THE EVENT}. The {CHANGE} contained {DESCRIPTION OF OR REASON FOR THE CHANGE, such as a change in code to update a system}.
-
-A bug in this code caused {DESCRIPTION OF THE PROBLEM}. The event was detected by {MONITORING SYSTEM}. The team started working on the event by {RESOLUTION ACTIONS TAKEN}. This {SEVERITY LEVEL} incident affected {X%} of users.
-
-There was further impact as noted by {e.g. NUMBER OF SUPPORT TICKETS SUBMITTED, SOCIAL MEDIA MENTIONS, CALLS TO ACCOUNT MANAGERS} were raised in relation to this incident.
+The factory server shutdown caused all pizza orders to fail. The event was detected by Grafana. The team started working on the event by carefully debugging code and examining logs. This severe incident affected 50% of users.
 ```
 
 ## Detection
@@ -21,13 +17,9 @@ There was further impact as noted by {e.g. NUMBER OF SUPPORT TICKETS SUBMITTED, 
 > When did the team detect the incident? How did they know it was happening? How could we improve time-to-detection? Consider: How would we have cut that time by half?
 
 ```md
-**EXAMPLE**:
+This incident was detected when the pizza creation failure alert was triggered and the dev team were paged. However, this was 10 minutes after the incident first appeared.
 
-This incident was detected when the {ALERT TYPE} was triggered and {TEAM/PERSON} were paged.
-
-Next, {SECONDARY PERSON} was paged, because {FIRST PERSON} didn't own the service writing to the disk, delaying the response by {XX MINUTES/HOURS}.
-
-{DESCRIBE THE IMPROVEMENT} will be set up by {TEAM OWNER OF THE IMPROVEMENT} so that {EXPECTED IMPROVEMENT}.
+More concise alerting systems will be set up by the dev team so that response time will improve.
 ```
 
 ## Impact
@@ -36,13 +28,9 @@ Next, {SECONDARY PERSON} was paged, because {FIRST PERSON} didn't own the servic
 > Describe how the incident impacted internal and external users during the incident. Include how many support cases were raised.
 
 ```md
-**EXAMPLE**:
+For 16 minutes between 17:45 UTC and 18:01 UTC on 04/08/26, the pizza factory server was shut down.
 
-For {XXhrs XX minutes} between {XX:XX UTC and XX:XX UTC} on {MM/DD/YY}, {SUMMARY OF INCIDENT} our users experienced this incident.
-
-This incident affected {XX} customers (X% OF {SYSTEM OR SERVICE} USERS), who experienced {DESCRIPTION OF SYMPTOMS}.
-
-{XX NUMBER OF SUPPORT TICKETS AND XX NUMBER OF SOCIAL MEDIA POSTS} were submitted.
+This incident affected 1 customer (50% OF JWT PIZZA USERS), who experienced order failure.
 ```
 
 ## Timeline
@@ -52,23 +40,13 @@ This incident affected {XX} customers (X% OF {SYSTEM OR SERVICE} USERS), who exp
 > Include any notable lead-up events, any starts of activity, the first known impact, and escalations. Note any decisions or changed made, and when the incident ended, along with any post-impact events of note.
 
 ```md
-**EXAMPLE**:
-
 All times are UTC.
 
-- _11:48_ - K8S 1.9 upgrade of control plane is finished
-- _12:46_ - Upgrade to V1.9 completed, including cluster-auto scaler and the BuildEng scheduler instance
-- _14:20_ - Build Engineering reports a problem to the KITT Disturbed
-- _14:27_ - KITT Disturbed starts investigating failures of a specific EC2 instance (ip-203-153-8-204)
-- _14:42_ - KITT Disturbed cordons the node
-- _14:49_ - BuildEng reports the problem as affecting more than just one node. 86 instances of the problem show failures are more systemic
-- _15:00_ - KITT Disturbed suggests switching to the standard scheduler
-- _15:34_ - BuildEng reports 200 pods failed
-- _16:00_ - BuildEng kills all failed builds with OutOfCpu reports
-- _16:13_ - BuildEng reports the failures are consistently recurring with new builds and were not just transient.
-- _16:30_ - KITT recognize the failures as an incident and run it as an incident.
-- _16:36_ - KITT disable the Escalator autoscaler to prevent the autoscaler from removing compute to alleviate the problem.
-- _16:40_ - KITT confirms ASG is stable, cluster load is normal and customer impact resolved.
+- _17:45_ - Pizza factory server shutdown started
+- _17:54_ - Dev team alerted
+- _17:55_ - Dev team debugging process started
+- _18:01_ - Server connection reestablished
+- _18:02_ - Pizza order successfully made. All systems in order
 ```
 
 ## Response
@@ -77,11 +55,7 @@ All times are UTC.
 > Who responded to the incident? When did they respond, and what did they do? Note any delays or obstacles to responding.
 
 ```md
-**EXAMPLE**:
-
-After receiving a page at {XX:XX UTC}, {ON-CALL ENGINEER} came online at {XX:XX UTC} in {SYSTEM WHERE INCIDENT INFO IS CAPTURED}.
-
-This engineer did not have a background in the {AFFECTED SYSTEM} so a second alert was sent at {XX:XX UTC} to {ESCALATIONS ON-CALL ENGINEER} into the who came into the room at {XX:XX UTC}.
+After receiving a page at 17:54 UTC, Developer A came online at 17:55 UTC in the JWT Pizza HQ.
 ```
 
 ## Root cause
@@ -90,9 +64,7 @@ This engineer did not have a background in the {AFFECTED SYSTEM} so a second ale
 > Note the final root cause of the incident, the thing identified that needs to change in order to prevent this class of incident from happening again.
 
 ```md
-**EXAMPLE**:
-
-A bug in connection pool handling led to leaked connections under failure conditions, combined with lack of visibility into connection state.
+A chaos testing experiment that shut down the factory server to test team response time and debugging ability.
 ```
 
 ## Resolution
@@ -102,11 +74,7 @@ A bug in connection pool handling led to leaked connections under failure condit
 > Depending on the scenario, consider these questions: How could you improve time to mitigation? How could you have cut that time by half?
 
 ```md
-**EXAMPLE**:
-By Increasing the size of the BuildEng EC3 ASG to increase the number of nodes available to support the workload and reduce the likelihood of scheduling on oversubscribed nodes
-
-Disabled the Escalator autoscaler to prevent the cluster from aggressively scaling-down
-Reverting the Build Engineering scheduler to the previous version.
+Connection to the server was restored by following the link given in the factory failure error response. Incident was deemed over when there was a successful pizza order. Upon examining the logs and the code, a system for reestablishing a factory server connection was discovered.
 ```
 
 ## Prevention
@@ -115,9 +83,7 @@ Reverting the Build Engineering scheduler to the previous version.
 > Now that you know the root cause, can you look back and see any other incidents that could have the same root cause? If yes, note what mitigation was attempted in those incidents and ask why this incident occurred again.
 
 ```md
-**EXAMPLE**:
-
-This same root cause resulted in incidents HOT-13432, HOT-14932 and HOT-19452.
+If there is another round of chaos testing, this issue may reoccur. Addressing the issue should be faster next time with a prior fix implemented.
 ```
 
 ## Action items
@@ -126,9 +92,6 @@ This same root cause resulted in incidents HOT-13432, HOT-14932 and HOT-19452.
 > Describe the corrective action ordered to prevent this class of incident in the future. Note who is responsible and when they have to complete the work and where that work is being tracked.
 
 ```md
-**EXAMPLE**:
-
-1. Manual auto-scaling rate limit put in place temporarily to limit failures
-1. Unit test and re-introduction of job rate limiting
-1. Introduction of a secondary mechanism to collect distributed rate information across cluster to guide scaling effects
+1. Updated error response alerting system
+2. Factory server backup
 ```
